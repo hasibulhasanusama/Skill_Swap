@@ -1,0 +1,42 @@
+{
+  "name": "skill-swap",
+  "version": "0.7.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "db:migrate": "node scripts/migrate.js",
+    "db:seed": "node scripts/seed.js",
+    "test": "node --test --test-concurrency=1 tests/*.test.js",
+    "check": "node scripts/check.js",
+    "upgrade:files": "node scripts/upgrade.js",
+    "test:e2e": "playwright test",
+    "db:seed:payments": "node scripts/seed-payments.js",
+    "db:seed:projects": "node scripts/seed-projects.js",
+    "db:seed:administration": "node scripts/seed-administration.js",
+    "setup": "node scripts/setup.js",
+    "admin:bootstrap": "node scripts/bootstrap-admin.js",
+    "qa:demo": "node scripts/qa-preview.js"
+  },
+  "dependencies": {
+    "connect-pg-simple": "10.0.0",
+    "dotenv": "17.2.3",
+    "express": "5.1.0",
+    "express-rate-limit": "8.1.0",
+    "express-session": "1.18.2",
+    "helmet": "8.1.0",
+    "multer": "2.0.2",
+    "pg": "8.16.3",
+    "zod": "4.1.12"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.3.14",
+    "@playwright/test": "1.56.1",
+    "jsdom": "26.1.0",
+    "supertest": "7.1.4"
+  }
+}

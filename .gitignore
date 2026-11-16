@@ -1,0 +1,12 @@
+node_modules/
+.env
+storage/private/*
+!storage/private/.gitkeep
+coverage/
+test-results/
+playwright-report/
+backups/
+
+.env.*
+!.env.example
+*.log

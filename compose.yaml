@@ -1,0 +1,17 @@
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: skillswap
+      POSTGRES_PASSWORD: skillswap
+      POSTGRES_DB: skillswap
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U skillswap"]
+      interval: 5s
+      retries: 10
+volumes:
+  pgdata:
