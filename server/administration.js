@@ -655,21 +655,39 @@ export function mountAdministration(
       ).rows,
     }),
   );
+
+  // Support chat notification delivery
   app.post("/api/support/tickets", login, async (req, res) => {
-    const b = z.object({ subject: short, body: bodyText }).parse(req.body);
-    const row = (
-      await db.query(
+    const b = z.object({
+      subject: short,
+      body: bodyText
+    }).parse(req.body);
+
+    const row = await transaction(db, async (c) => {
+      const ticket = (await c.query(
         "INSERT INTO support_tickets(user_id,subject,body) VALUES($1,$2,$3) RETURNING *",
-        [req.user.id, b.subject, b.body],
-      )
-    ).rows[0];
-    res
-      .status(201)
-      .json({
-        ticket: row,
-        message: "Support request stored for platform review.",
-      });
+        [req.user.id, b.subject, b.body]
+      )).rows[0];
+
+      await c.query(
+        "INSERT INTO notifications(user_id,title,route,event_key) SELECT u.id,$1,$2,$3 FROM users u JOIN admin_roles r ON r.key=u.admin_role WHERE u.role='admin' AND u.suspended=false AND u.id<>$4 AND (r.permissions @> ARRAY['*'] OR (r.permissions @> ARRAY['support.read'] AND r.permissions @> ARRAY['support.write'])) ON CONFLICT DO NOTHING",
+        [
+          "New support message: " + b.subject,
+          "admin/ticket/" + ticket.id,
+          "support-new-" + ticket.id,
+          req.user.id
+        ]
+      );
+
+      return ticket;
+    });
+
+    res.status(201).json({
+      ticket: row,
+      message: "Message sent to support."
+    });
   });
+
   app.get("/api/support/tickets/:id", login, async (req, res) => {
     const t = (
       await db.query("SELECT * FROM support_tickets WHERE id=$1", [
@@ -688,31 +706,60 @@ export function mountAdministration(
       ).rows,
     });
   });
+
   app.post("/api/support/tickets/:id/replies", login, async (req, res) => {
     const b = z.object({ body: bodyText }).parse(req.body);
+
     await transaction(db, async (c) => {
-      const t = (
-        await c.query("SELECT * FROM support_tickets WHERE id=$1 FOR UPDATE", [
-          id.parse(req.params.id),
-        ])
-      ).rows[0];
-      if (!t || (t.user_id !== req.user.id && !can(req.user, "support.write")))
+      const t = (await c.query(
+        "SELECT * FROM support_tickets WHERE id=$1 FOR UPDATE",
+        [id.parse(req.params.id)]
+      )).rows[0];
+
+      if (!t || (t.user_id !== req.user.id && !can(req.user, "support.write"))) {
         throw fail(404, "Support request not found.");
-      if (t.status === "resolved")
-        throw fail(
-          409,
-          "This support request is resolved. Open a new request if needed.",
-        );
+      }
+
+      if (t.status === "resolved") {
+        throw fail(409, "This support request is resolved. Open a new request if needed.");
+      }
+
+      const reply = (await c.query(
+        "INSERT INTO support_replies(ticket_id,author_id,body) VALUES($1,$2,$3) RETURNING id",
+        [t.id, req.user.id, b.body]
+      )).rows[0];
+
       await c.query(
-        "INSERT INTO support_replies(ticket_id,author_id,body) VALUES($1,$2,$3)",
-        [t.id, req.user.id, b.body],
+        "UPDATE support_tickets SET updated_at=now() WHERE id=$1",
+        [t.id]
       );
-      await c.query("UPDATE support_tickets SET updated_at=now() WHERE id=$1", [
-        t.id,
-      ]);
+
+      if (t.user_id !== req.user.id) {
+        await c.query(
+          "INSERT INTO notifications(user_id,title,route,event_key) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING",
+          [
+            t.user_id,
+            "Support replied: " + t.subject,
+            "help?ticket=" + t.id,
+            "support-reply-" + reply.id
+          ]
+        );
+      } else {
+        await c.query(
+          "INSERT INTO notifications(user_id,title,route,event_key) SELECT u.id,$1,$2,$3 FROM users u JOIN admin_roles r ON r.key=u.admin_role WHERE u.role='admin' AND u.suspended=false AND u.id<>$4 AND (r.permissions @> ARRAY['*'] OR (r.permissions @> ARRAY['support.read'] AND r.permissions @> ARRAY['support.write'])) ON CONFLICT DO NOTHING",
+          [
+            "New support reply: " + t.subject,
+            "admin/ticket/" + t.id,
+            "support-reply-" + reply.id,
+            req.user.id
+          ]
+        );
+      }
     });
-    res.status(201).json({ message: "Support reply recorded." });
+
+    res.status(201).json({ message: "Reply sent." });
   });
+
   app.get("/api/admin/complaints", admin, async (req, res) =>
     res.json({
       items: (

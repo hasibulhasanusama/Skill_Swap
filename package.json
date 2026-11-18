@@ -20,18 +20,20 @@
     "db:seed:administration": "node scripts/seed-administration.js",
     "setup": "node scripts/setup.js",
     "admin:bootstrap": "node scripts/bootstrap-admin.js",
-    "qa:demo": "node scripts/qa-preview.js"
+    "qa:demo": "node scripts/qa-preview.js",
+    "test:arena": "node --test --test-concurrency=1 tests/arena.test.js tests/arena-ui.test.js"
   },
   "dependencies": {
     "connect-pg-simple": "10.0.0",
     "dotenv": "17.2.3",
     "express": "5.1.0",
-    "express-rate-limit": "8.1.0",
+    "express-rate-limit": "8.7.4",
     "express-session": "1.18.2",
     "helmet": "8.1.0",
-    "multer": "2.0.2",
+    "multer": "2.5.0",
+    "pdfkit": "0.17.2",
     "pg": "8.16.3",
-    "zod": "4.1.12"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.3.14",

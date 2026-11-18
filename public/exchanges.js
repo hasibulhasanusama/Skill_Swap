@@ -120,11 +120,9 @@ export function createExchangeUI({
     return shell(
       "dashboard/preferences",
       /* HTML */ `<div class="eyebrow">WHAT YOU KNOW / WHAT COMES NEXT</div>
-        <h1>Shape your skill exchange.</h1>
+        <h1>Set Exchange Skills</h1>
         <p>
-          Use the same skill names as your potential partners. Matching checks
-          complementary skills, proficiency, and at least 15 minutes of shared
-          recurring availability.
+          Add what you can teach, what you want to learn and your availability. Review and confirm to publish your offer.
         </p>
         <div class="panel">
           ${form(
@@ -160,83 +158,58 @@ export function createExchangeUI({
                 These are preferences, not reserved times. Actual dates are
                 checked for booking conflicts when the agreement is accepted.
               </div>`,
-            "Save exchange preferences",
+            "Review & Confirm",
           )}
         </div>`,
     );
   }
+
+  // Published exchange offer board
   async function matches() {
-    const d = await api("/exchange/matches");
-    return shell(
-      "dashboard/matches",
-      /* HTML */ `<div class="section-heading">
-          <div>
-            <div class="eyebrow">RECIPROCAL LEARNING</div>
-            <h1>Find your exchange partner.</h1>
-          </div>
-          <a href="#dashboard/preferences">Edit preferences →</a>
-        </div>
-        <p>
-          ${e(d.method)} This is a rules-based matching system, not AI. A score
-          ranks preference fit; it is not a measure of teaching quality.
-        </p>
-        <div class="grid">
-          ${
-            d.items
-              .map(
-                (m) =>
-                  /* HTML */ `<article class="card">
-                    <div class="mentor">
-                      <span class="avatar"
-                        >${e(
-                          m.student.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .slice(0, 2)
-                            .join(""),
-                        )}</span
-                      >
-                      <div>
-                        <h3>${e(m.student.name)}</h3>
-                        <small>${e(m.student.institution)}</small>
-                      </div>
-                    </div>
-                    <span class="pill teal"
-                      >Preference fit: ${m.score}/100</span
-                    >
-                    <h3>Why you match</h3>
-                    <ul class="explanations">
-                      ${m.explanations.map((t) => `<li>${e(t)}</li>`).join("")}
-                    </ul>
-                    ${form(
-                      "request-" + m.student.id,
-                      /* HTML */ `<label
-                          >You teach<select name="requester_skill">
-                            ${m.give.map((s) => `<option>${e(s)}</option>`).join("")}
-                          </select></label
-                        ><label
-                          >You learn<select name="recipient_skill">
-                            ${m.receive.map((s) => `<option>${e(s)}</option>`).join("")}
-                          </select></label
-                        ><label
-                          >Introduce your exchange<textarea
-                            name="message"
-                            minlength="5"
-                            maxlength="1000"
-                            required
-                            placeholder="What would you like to work on together?"
-                          ></textarea>
-                        </label>`,
-                      "Send exchange request",
-                    )}
-                  </article>`,
-              )
-              .join("") ||
-            '<div class="panel empty">No complementary matches yet. Add skills you can teach, skills you want to learn, and recurring availability. <a href="#dashboard/preferences">Update preferences →</a></div>'
-          }
-        </div>`,
-    );
+    const d = await api("/exchange/offers");
+
+    const skillList = (items, kind) => items
+      .filter(s => s.kind === kind)
+      .map(s => '<span class="pill">' + e(s.skill) +
+        ' ? ' + e(levels[s.level]) + '</span>')
+      .join(" ");
+
+    const cards = d.items.map(offer => {
+      const own = offer.user_id === user().id;
+      const available = offer.availability.map(a =>
+        e(days[a.weekday]) + " " +
+        time(a.start_minute) + "?" + time(a.end_minute)
+      ).join("<br>");
+
+      return '<article class="panel ss-exchange-offer">' +
+        '<div class="ss-offer-person"><span class="avatar">' +
+        e(offer.name.trim().charAt(0).toUpperCase()) +
+        '</span><div><h3>' + e(offer.name) + '</h3><small>' +
+        e(offer.institution || "") + '</small></div>' +
+        (own ? '<span class="pill">Your offer</span>' : "") +
+        '</div><h4>Can teach</h4><div class="ss-offer-skills">' +
+        skillList(offer.skills, "teach") +
+        '</div><h4>Wants to learn</h4><div class="ss-offer-skills">' +
+        skillList(offer.skills, "learn") +
+        '</div><h4>Available ? Asia/Dhaka</h4><p>' +
+        available + '</p><div class="ss-offer-footer">' +
+        (own
+          ? '<a class="button secondary small" href="#dashboard/preferences">Edit my offer</a><button type="button" class="secondary small ss-unpublish-offer">Unpublish</button>'
+          : '<a class="button secondary small" href="#dashboard/preferences">Set my exchange skills</a>') +
+        '</div></article>';
+    }).join("");
+
+    return shell("dashboard/matches",
+      '<div class="section-heading"><div>' +
+      '<div class="eyebrow">LEARN THROUGH EXCHANGE</div>' +
+      '<h1>Exchange Skills</h1></div>' +
+      '<a class="button" href="#dashboard/preferences">Set Exchange Skills</a>' +
+      '</div><p>Explore what students can teach and what they want to learn in return. No payment required.</p>' +
+      '<div class="ss-exchange-offer-grid">' +
+      (cards || '<div class="panel empty">No published offers yet. Set your exchange skills and confirm to publish the first one.</div>') +
+      '</div>');
   }
+
   const action = (id, a, label) =>
     `<button type="button" class="${a === "accept" ? "" : "secondary"} small exchange-action" data-id="${id}" data-action="${a}">${label}</button>`;
   function exchangeCard(x) {
@@ -516,6 +489,22 @@ ${e(x.recipient_objective)}</textarea>
     window.dispatchEvent(new HashChangeEvent("hashchange"));
   }
   function wire() {
+    document.querySelectorAll(".ss-unpublish-offer").forEach(button => {
+      button.addEventListener("click", async () => {
+        if (!window.confirm("Remove your offer from the exchange list?")) return;
+        button.disabled = true;
+        try {
+          await api("/exchange/offers/mine", "DELETE");
+          notice("Offer unpublished.");
+          await rerender();
+        } catch (error) {
+          notice(error.message);
+        } finally {
+          button.disabled = false;
+        }
+      });
+    });
+
     document.querySelectorAll('[id^="terminate-exchange-"]').forEach((f) =>
       bind(f.id, async (b) => {
         notice(
@@ -562,10 +551,39 @@ ${e(x.recipient_objective)}</textarea>
           end_minute: minutes(r.querySelector("[name=end]").value) || 1440,
         }),
       );
-      notice(
-        (await api("/exchange/preferences", "PUT", { skills, availability }))
-          .message,
-      );
+
+      if (!skills.some(s => s.kind === "teach") ||
+          !skills.some(s => s.kind === "learn")) {
+        throw new Error("Add at least one skill to teach and one to learn.");
+      }
+
+      if (!availability.length) {
+        throw new Error("Add an availability window.");
+      }
+
+      const teach = skills.filter(s => s.kind === "teach")
+        .map(s => s.skill + " (" + levels[s.level] + ")").join(", ");
+      const learn = skills.filter(s => s.kind === "learn")
+        .map(s => s.skill + " (" + levels[s.level] + ")").join(", ");
+      const available = availability.map(a =>
+        days[a.weekday] + " " + time(a.start_minute) +
+        "?" + time(a.end_minute)
+      ).join("\n");
+
+      const summary =
+        "REVIEW YOUR EXCHANGE OFFER\n\n" +
+        "Can teach: " + teach + "\n\n" +
+        "Wants to learn: " + learn + "\n\n" +
+        "Available (Asia/Dhaka):\n" + available +
+        "\n\nYour name, institution, skills and availability will appear in the exchange list.\n\nConfirm and publish?";
+
+      if (!window.confirm(summary)) return;
+
+      await api("/exchange/preferences", "PUT", { skills, availability });
+      await api("/exchange/offers/mine", "PUT", { confirmed: true });
+      notice("Your exchange offer is published.");
+      location.hash = "dashboard/matches";
+
     });
     document.querySelectorAll('[id^="request-"]').forEach((f) =>
       bind(f.id, async (b) => {

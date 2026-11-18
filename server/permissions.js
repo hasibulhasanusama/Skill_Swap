@@ -1,4 +1,5 @@
 export const permissionCatalog = [
+  "arena.manage",
   "overview.read",
   "users.read",
   "users.write",

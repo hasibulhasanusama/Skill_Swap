@@ -1,3 +1,4 @@
+import {mountSessionTimers,assertSessionTime} from "./session-timer.js";
 import {
   requireFundedBooking,
   releaseForConfirmedBooking,
@@ -112,6 +113,8 @@ export function mountLearning(
   app,
   { db, login, approved, admin, upload, storage, completionResponseHours = 72 },
 ) {
+  // Shared class session timer
+  mountSessionTimers(app,{db,login,sessionContext,sessionOpen});
   app.get("/api/learning/contexts", login, async (req, res) => {
     const b = (
       await db.query(
@@ -582,6 +585,7 @@ export function mountLearning(
         throw fail(403, "Only the Student Mentor can record delivery.");
       if (Date.parse(b.ends_at) > Date.now())
         throw fail(409, "Record completion after the session ends.");
+      await assertSessionTime(c,"booking",id);
       await requireFundedBooking(c, b);
       await c.query(
         "UPDATE bookings SET learning_status='completion_pending',mentor_completed_at=now(),confirmation_due_at=now()+($1 * interval '1 hour') WHERE id=$2",

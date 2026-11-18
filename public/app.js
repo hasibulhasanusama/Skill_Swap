@@ -1,3 +1,4 @@
+import { createArenaUI } from "./arena.js";
 import { createAdministrationUI } from "./administration.js";
 import { createProjectUI } from "./projects.js";
 import { createPaymentUI } from "./payments.js";
@@ -78,7 +79,7 @@ async function api(url, method = "GET", body) {
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20000);
+  const timeout = setTimeout(() => controller.abort(), url.startsWith("/arena/") && (url.endsWith("/generate") || url.endsWith("/answer") || url.endsWith("/task")) ? 120000 : 20000);
 
   try {
     const response = await fetch("/api" + url, {
@@ -146,23 +147,63 @@ function account() {
   const element = $("#account");
   if (!element) return;
 
+
   element.innerHTML = user
     ? `
-      <span class="name">${e(user.name.split(" ")[0])}</span>
-      <a
-        class="button small"
-        href="#${user.role === "admin" ? adminHome() : "dashboard"}"
+      
+      
+<div class="ss-notification-wrap">
+  <button type="button"
+        id="ss-notification-bell"
+        class="ss-notification-bell"
+        aria-label="Notifications" aria-expanded="false" aria-controls="ss-notification-popup"
+        title="Notifications"
       >
-        Dashboard
-      </a>
-      <button class="secondary small" id="logout" type="button">
-        Sign out
+        <svg viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="1.7"
+          stroke-linecap="round" stroke-linejoin="round"
+          aria-hidden="true">
+          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/>
+          <path d="M10 21h4"/>
+        </svg>
+        <span id="ss-notification-count"
+          class="ss-notification-count" hidden></span>
       </button>
+  <div id="ss-notification-popup" hidden>
+    <div class="ss-notification-heading">
+      <strong>Notifications</strong>
+      <button type="button" id="ss-notification-refresh">Refresh</button>
+    </div>
+    <div id="ss-notification-items" role="region"
+      aria-label="Recent notifications" aria-live="polite"></div>
+  </div>
+</div>
+
+      <details class="ss-account-menu">
+        <summary aria-label="Open account menu">
+          <span class="ss-profile-avatar">
+            ${user.has_avatar
+              ? '<img src="/api/profile/avatar?v=' + encodeURIComponent(user.avatar_updated_at || "") + '" alt="Profile picture">'
+              : e(user.name.trim().charAt(0).toUpperCase())}
+          </span>
+        </summary>
+
+        <div class="ss-account-dropdown">
+          <strong>${e(user.name)}</strong>
+          <a href="#dashboard/settings">Profile</a>
+          <a href="#${user.role === "admin" ? adminHome() : "dashboard"}">Dashboard</a>
+          <a href="#dashboard/notifications">Notifications</a>
+          <a href="#dashboard/account">Settings</a>
+          <button id="logout" type="button">Logout</button>
+        </div>
+      </details>
     `
     : `
       <a href="#login">Sign in</a>
-      <a class="button small" href="#register">Join Skill Swap ↗</a>
+      <a class="button small" href="#register">Join Skill Swap</a>
     `;
+
+  void updateNotificationBadge();
 
   $("#logout")?.addEventListener("click", async (event) => {
     const button = event.currentTarget;
@@ -333,6 +374,7 @@ const adminNavigationPermissions = {
   admin: "overview.read",
   "admin/verification": "verification.read",
   "admin/audit": "audit.read",
+  "arena/admin": "arena.manage",
   "admin/exchanges": "exchanges.read",
   "admin/learning": "bookings.read",
   "admin/payments": "payments.read",
@@ -358,48 +400,137 @@ function adminHome() {
 }
 
 function shell(active, body, admin = false) {
-  const links = admin
+
+  // Standalone teaching and exchange pages
+  const standalonePages = [
+    "dashboard/new",
+    "dashboard/matches",
+    "dashboard/preferences"
+  ];
+
+  if (!admin && user?.role !== "admin" &&
+      standalonePages.includes(active)) {
+    return '<section class="ss-standalone-page">' + body + '</section>';
+  }
+
+
+
+  const profileRoutes = [
+    "dashboard/settings",
+    "dashboard/messages"
+  ];
+
+  const settingsRoutes = [
+    "dashboard/account",
+    "dashboard/help"
+  ];
+
+  const studentLinks = profileRoutes.includes(active)
     ? [
-        ["admin", "Overview"],
-        ["admin/verification", "Verification queue"],
-        ["admin/audit", "Audit log"],
-        ["admin/exchanges", "Exchanges & reports"],
-        ["admin/learning", "Session inspection"],
-        ["admin/payments", "Payments & withdrawals"],
-        ["admin/disputes", "Payment disputes"],
-        ["admin/reviews", "Review moderation"],
-        ["admin/portfolios", "Portfolio moderation"],
-        ["admin/users", "Student accounts"],
-        ["admin/categories", "Categories"],
-        ["admin/listings", "Listing moderation"],
-        ["admin/announcements", "Announcements"],
-        ["admin/policies", "Policy settings"],
-        ["admin/access", "Roles & access"],
-        ["admin/support", "Support requests"],
-        ["admin/reports", "Reports"],
-        ["dashboard/account", "My account"],
+        ["dashboard/settings", "Profile & Verification"],
+        ["dashboard/messages", "Messages"]
       ]
-    : [
-        ["dashboard", "Overview"],
-        ["dashboard/learning", "My learning"],
-        ["dashboard/teaching", "My teaching"],
-        ["dashboard/schedule", "Schedule"],
-        ["dashboard/messages", "Messages & materials"],
-        ["dashboard/notifications", "Notifications"],
-        ["dashboard/payments", "Payments & earnings"],
-        ["dashboard/disputes", "Payment complaints"],
-        ["dashboard/projects", "Exercises & projects"],
-        ["dashboard/portfolio", "My portfolio"],
-        ["dashboard/reviews", "Reviews"],
-        ["dashboard/saved", "Saved skills"],
-        ["dashboard/exchanges", "My exchanges"],
-        ["dashboard/matches", "Find exchange partners"],
-        ["dashboard/preferences", "Exchange preferences"],
-        ["dashboard/settings", "Profile & verification"],
-        ["dashboard/account", "Account & privacy"],
-        ["dashboard/commitments", "Cancellations"],
-        ["dashboard/help", "Help & support"],
-      ];
+    : settingsRoutes.includes(active)
+      ? [
+          ["dashboard/account", "Account & Privacy"],
+          ["dashboard/help", "Help & Support"]
+        ]
+      : active === "dashboard/notifications"
+        ? [
+            ["dashboard/notifications", "Notifications"]
+          ]
+        : [
+            ["dashboard", "Overview"],
+            ["dashboard/learning", "My Learning"],
+            ["dashboard/teaching", "My Teaching"],
+            ["dashboard/schedule", "Schedule"],
+            ["dashboard/exchanges", "My Exchanges"],
+            ["arena", "Skill Arena & Results"],
+            ["dashboard/payments", "Payments & Earnings"],
+            ["dashboard/disputes", "Payment Complaints"],
+            ["dashboard/projects", "Exercises & Projects"],
+            ["dashboard/portfolio", "My Portfolio and Skills"],
+            ["dashboard/reviews", "Reviews"]
+          ];
+
+  // Separate administrator navigation
+  const isAdministrator = user?.role === "admin";
+  if (isAdministrator) admin = true;
+
+  const adminProfile = active === "dashboard/settings";
+  const adminSettings = [
+    "dashboard/account",
+    "dashboard/help",
+    "admin/access"
+  ].includes(active);
+
+  const adminNotifications = active === "dashboard/notifications";
+
+  const adminLinks = adminProfile
+    ? [
+        ["dashboard/settings", "My Profile"]
+      ]
+    : adminSettings
+      ? [
+          ["dashboard/account", "Account & Privacy"],
+          ["dashboard/help", "Help & Support"],
+          ["admin/access", "Roles & Access"]
+        ]
+      : adminNotifications
+        ? [
+            ["dashboard/notifications", "Notifications"]
+          ]
+        : [
+            ["admin", "Overview"],
+            ["admin/users", "Students"],
+            ["admin/listings", "Skill Listings"],
+            ["admin/categories", "Categories"],
+            ["admin/verification", "Verification"],
+            ["admin/payments", "Payments & Withdrawals"],
+            ["admin/disputes", "Payment Complaints"],
+            ["admin/support", "Support Requests"],
+            ["admin/reports", "Reports"],
+            ["admin/audit", "Audit Log"],
+            ["arena/admin", "Game PDF Library"]
+          ];
+
+  // Keep the current management page reachable when opened by a direct link.
+  const extraAdminPages = {
+    "admin/exchanges": "Exchanges & Reports",
+    "admin/learning": "Session Inspection",
+    "admin/reviews": "Review Moderation",
+    "admin/portfolios": "Portfolio Moderation",
+    "admin/announcements": "Announcements",
+    "admin/policies": "Policy Settings"
+  };
+
+  if (extraAdminPages[active]) {
+    adminLinks.push([active, extraAdminPages[active]]);
+  }
+
+  const links = admin ? adminLinks : studentLinks;
+
+  if (isAdministrator && adminProfile) {
+    const page = new DOMParser().parseFromString(body, "text/html");
+
+    for (const heading of page.querySelectorAll("h2")) {
+      if (heading.textContent.trim() === "Student verification") {
+        heading.closest(".panel")?.remove();
+      }
+    }
+
+    for (const link of page.querySelectorAll('a[href="#dashboard/messages"]')) {
+      link.remove();
+    }
+
+    const columns = page.querySelector(".two");
+    if (columns && columns.children.length === 1) {
+      columns.classList.remove("two");
+    }
+
+    body = page.body.innerHTML;
+  }
+
 
   return `
     <div class="layout">
@@ -429,96 +560,207 @@ function shell(active, body, admin = false) {
     </div>
   `;
 }
-
 function home() {
   return `
-    <section class="hero">
-      <div>
-        <div class="eyebrow">A CAMPUS FULL OF POSSIBILITIES</div>
+    <div class="ss-home">
+      <section
+        class="ss-home-hero"
+        aria-labelledby="ss-home-title"
+      >
+        <div class="ss-home-intro">
+          <span class="ss-home-eyebrow">
+            A COMMUNITY BUILT ON SHARED KNOWLEDGE
+          </span>
 
-        <h1>
-          Learn something new.<br>
-          <em>From someone<br>like you.</em>
-        </h1>
+          <h1 id="ss-home-title">
+            Something you know.<br>
+            Something they need.<br>
+            <em>A chance to grow together.</em>
+          </h1>
 
-        <p>
-          Find a student who can help you take the next step.
-          Book a focused session, share your own skills, or
-          learn from each other through an exchange.
+          <p>
+            You do not need to know everything to help
+            someone get started. Learn from a fellow student,
+            share what you know, and take the next step together.
+          </p>
+        </div>
+
+        
+<div class="ss-home-conversation">
+          <div class="ss-home-conversation-heading">
+            <span
+              class="ss-home-status-dot"
+              aria-hidden="true"
+            ></span>
+
+            Good learning starts with a conversation
+          </div>
+
+          <div class="ss-home-messages">
+            <article
+              class="ss-home-message ss-home-message-learn"
+            >
+              <span
+                class="ss-home-avatar"
+                aria-hidden="true"
+              >
+                L
+              </span>
+
+              <div>
+                <span class="ss-home-message-label">
+                  I WANT TO LEARN
+                </span>
+
+                <h2>
+                  “Can someone help me build my first website?”
+                </h2>
+
+                <p>
+                  I know the basics.
+                  I just need a little guidance.
+                </p>
+              </div>
+            </article>
+
+            <div
+              class="ss-home-connection"
+              aria-hidden="true"
+            >
+            </div>
+
+            <article
+              class="ss-home-message ss-home-message-teach"
+            >
+              <span
+                class="ss-home-avatar"
+                aria-hidden="true"
+              >
+                T
+              </span>
+
+              <div>
+                <span class="ss-home-message-label">
+                  I WANT TO TEACH
+                </span>
+
+                <h2>
+                  “I can help.
+                  Let’s build something together.”
+                </h2>
+
+                <p>
+                  We can start small and practise
+                  one step at a time.
+                </p>
+              </div>
+            </article>
+          </div>
+
+        </div>
+      </section>
+
+      <section
+        class="ss-home-paths" id="ss-home-skills"
+        aria-labelledby="ss-home-path-title"
+      >
+        <div class="ss-home-section-intro">
+
+
+          <h2 id="ss-home-path-title">
+                       Learn,Teach & Grow Together
+          </h2>
+
+        </div>
+
+        <div class="ss-home-path-grid">
+          <article class="ss-home-path ss-home-path-learn">
+            <div class="ss-home-path-top">
+              <span class="ss-home-path-number">
+                
+              </span>
+            </div>
+
+            <h3>Learn Skills</h3>
+
+            <p>
+              Find something you want to learn,
+              book a session, and turn your curiosity
+              into something you can do.
+            </p>
+
+            <a class="button" href="#explore">
+              Start learning →
+            </a>
+
+            <nav
+              class="ss-home-path-links"
+              aria-label="Learning shortcuts"
+            >
+            </nav>
+          </article>
+
+          <article class="ss-home-path ss-home-path-teach">
+            <div class="ss-home-path-top">
+              <span class="ss-home-path-number">
+                
+              </span>
+            </div>
+
+            <h3>Teach Skills</h3>
+
+            <p>
+              Share something you know,
+              create a skill listing, and help
+              another student take their first step.
+            </p>
+
+            <a class="button" href="#dashboard/new">
+              Start teaching →
+            </a>
+
+            <nav
+              class="ss-home-path-links"
+              aria-label="Teaching shortcuts"
+            >
+            </nav>
+          </article>
+        
+          <article class="ss-home-path ss-home-path-exchange">
+            
+
+            <h3>Exchange Skills</h3>
+
+            <p>
+              Teach what you know and learn something new
+              in return. Explore skill exchanges with
+              fellow students, without paying a fee.
+            </p>
+
+            <a class="button" href="#dashboard/matches">Start Exchange &rarr;</a>
+
+            
+          </article>
+
+
+  <div class="ss-home-section-intro ss-home-game-heading">
+    <h2 id="ss-home-game-title">Play, Practice &amp; Grow Together</h2>
+  </div>
+  <article class="arena-game-card arena-detective">
+<span class="arena-game-icon" aria-hidden="true">01</span><span class="arena-kicker">STUDY &amp; SOLVE</span><h3>Skill Detective</h3><p>Study a PDF, spot the mistake and discover why. Play solo, against a bot or with friends.</p><a class="button" href="#arena/detective">Play Detective &rarr;</a></article>
+<article class="arena-game-card arena-relay"><span class="arena-game-icon" aria-hidden="true">02</span><span class="arena-kicker">SET &amp; SOLVE</span><h3>Code Relay</h3><p>Set a coding problem. Solve your friends’ questions. Take turns and race the clock.</p><a class="button" href="#arena/relay">Start Code Relay &rarr;</a></article>
+<article class="arena-game-card arena-typing"><span class="arena-game-icon" aria-hidden="true">03</span><span class="arena-kicker">TYPE &amp; RACE</span><h3>TypeSprint</h3><p>Build typing speed and accuracy in Bangla, English or code. Race a friend or a practice bot.</p><a class="button" href="#arena/typing">Start TypeSprint &rarr;</a></article>
+</div>
+
+        <p class="ss-home-account-note">
+          Sign in to access your learning and teaching tools.
+          Student verification is required to publish
+          or book sessions.
         </p>
+      </section>
 
-        <div class="actions">
-          <a class="button" href="#explore">
-            Find your next skill ↗
-          </a>
-          <a class="button secondary" href="#exchange">
-            Explore skill exchange
-          </a>
-        </div>
-
-        <div class="checks">
-          <span>✓ Students only</span>
-          <span>✓ Practical learning</span>
-        </div>
-      </div>
-
-      <div class="hero-art">
-        <div class="art-top">
-          <span>Better, together</span>
-          <span class="exchange-tag">SKILL EXCHANGE</span>
-        </div>
-
-        <div class="mini">
-          <span class="avatar">AR</span>
-          <div>
-            <strong>I can teach web design.</strong>
-            <small>I want to learn presentation skills.</small>
-          </div>
-        </div>
-
-        <div class="exchange-arrow">↕</div>
-
-        <div class="mini">
-          <span class="avatar">NA</span>
-          <div>
-            <strong>I can teach public speaking.</strong>
-            <small>I want to build my first website.</small>
-          </div>
-        </div>
-
-        <div class="art-foot">
-          An example of what you can learn from each other
-        </div>
-      </div>
-    </section>
-
-    <div class="strip">
-      <div>
-        <strong>01 / Learn a Skill</strong>
-        <p>Focused sessions at student-friendly prices.</p>
-      </div>
-
-      <div>
-        <strong>02 / Teach a Skill</strong>
-        <p>Turn your experience into someone's next step.</p>
-      </div>
-
-      <div>
-        <strong>03 / Exchange a Skill</strong>
-        <p>Share what you know. Learn something new.</p>
-      </div>
-    </div>
-
-    <div class="section-heading">
-      <div>
-        <div class="eyebrow">FIND YOUR STARTING POINT</div>
-        <h2>Skills worth making time for</h2>
-      </div>
-      <a href="#explore">View all skills →</a>
-    </div>
-
-    <div class="grid" id="home-skills" aria-live="polite">
-      <p>Loading available skills…</p>
+      
+      
     </div>
   `;
 }
@@ -652,12 +894,12 @@ async function explore() {
         >
       </label>
 
-      <button type="submit">Search</button>
+      <button type="submit" class="skill-search-button">Search</button>
     </form>
 
     <p>
-      ${data.total} skills available · Student identity is reviewed;
-      teaching ability is not certified.
+      
+      
     </p>
 
     <div class="grid">
@@ -1111,13 +1353,52 @@ async function dashboard(route) {
 
   if (route === "dashboard/settings") {
     body = `
-      <h1>Profile & verification</h1>
+      <h1>My Profile</h1>
+
+      <div class="panel ss-profile-card">
+        <span class="ss-profile-avatar ss-profile-avatar-large">
+          ${user.has_avatar
+            ? '<img src="/api/profile/avatar?v=' + encodeURIComponent(user.avatar_updated_at || "") + '" alt="Profile picture">'
+            : e(user.name.trim().charAt(0).toUpperCase())}
+        </span>
+
+        <div class="ss-profile-details">
+          <h2>${e(user.name)}</h2>
+          <p>${e(user.institution || "")}</p>
+          
+        </div>
+
+        <div class="ss-photo-actions">
+          ${form(
+            "avatar-upload",
+            '<label>Profile picture (PNG/JPEG, max 5 MB)<input name="avatar" type="file" accept="image/png,image/jpeg" required></label>',
+            "Upload picture"
+          )}
+          ${user.has_avatar
+            ? form("avatar-remove", "", "Remove picture")
+            : ""}
+        </div>
+      </div>
 
       <div class="two">
         <div class="panel">
           ${form(
             "profile",
             field("name", "Name", "text", user.name) +
+              field("phone", "Phone number", "tel", user.phone || "") +
+              field("age", "Age", "number", user.age ?? "", 'min="1" max="120" step="1"') +
+              field("email", "Email address", "email", user.email, 'required autocomplete="email"') +
+              `
+                <label>
+                  Gender
+                  <select name="gender">
+                    <option value="" ${!user.gender ? "selected" : ""}>Select gender</option>
+                    <option value="male" ${user.gender === "male" ? "selected" : ""}>Male</option>
+                    <option value="female" ${user.gender === "female" ? "selected" : ""}>Female</option>
+                  </select>
+                </label>
+              ` +
+
               field(
                 "institution",
                 "Institution",
@@ -1136,20 +1417,39 @@ async function dashboard(route) {
 
         <div class="panel">
           <h2>Student verification</h2>
-          <span class="pill">${e(user.verification)}</span>
+          <span class="pill">${e(
+            data.verification?.reason?.startsWith("Demo approval:")
+              ? "Demo approved"
+              : user.verification
+          )}</span>
 
           <p>
             ${e(
               data.verification?.reason ||
-                "Upload your current student ID for manual review.",
+                "Enter your Student ID and upload an ID card for automatic demo approval. Identity is not authenticated.",
             )}
           </p>
 
           ${
-            !["approved", "pending"].includes(user.verification)
+            user.role === "student" /* verification-resubmit */
               ? form(
                   "verify",
                   `
+                    
+                    <label>
+                      Student ID
+                      <input
+                        name="student_id"
+                        type="text"
+                        value="${e(user.student_id || "")}"
+                        placeholder="242-35-350"
+                        pattern="[0-9]{3}-[0-9]{2}-[0-9]{3}"
+                        title="Use this format: 242-35-350"
+                        maxlength="10"
+                        required
+                      >
+                    </label>
+
                     <label>
                       Private student ID
                       (PDF, PNG, JPEG, max 5 MB)
@@ -1161,7 +1461,7 @@ async function dashboard(route) {
                       >
                     </label>
                   `,
-                  "Submit student ID",
+                  "Submit / Update demo verification",
                 )
               : ""
           }
@@ -1267,11 +1567,14 @@ async function dashboard(route) {
   } else {
     body = `
       <div class="eyebrow">YOUR LEARNING SPACE</div>
-      <h1>Hello, ${e(user.name.split(" ")[0])}.</h1>
+      <h1>Hello, ${e(user.name)}.</h1>
       <p>
         A little practice today.
         A little more possibility tomorrow.
       </p>
+
+      
+      
 
       <div class="stats">
         <div class="panel stat">
@@ -1305,23 +1608,7 @@ async function dashboard(route) {
         </div>
       </div>
 
-      <div class="note">
-        ${
-          (data.exchanges || []).filter(
-            (exchange) => exchange.status === "active",
-          ).length
-        }
-        active exchanges ·
-
-        ${
-          (data.exchanges || []).filter((exchange) =>
-            ["pending", "negotiating"].includes(exchange.status),
-          ).length
-        }
-        requests or agreements awaiting action.
-
-        <a href="#dashboard/exchanges">Open My exchanges →</a>
-      </div>
+      
 
       ${
         user.verification !== "approved"
@@ -1564,7 +1851,7 @@ function info(route) {
       <div class="note">${e(note)}</div>
 
       <div class="actions">
-        <a class="button" href="#explore">Explore skills →</a>
+        ${route === "help" ? '<section id="ss-help-chat"></section>' : '<a class="button" href="#explore">Explore skills</a>'}
 
         ${
           route === "exchange"
@@ -1756,6 +2043,8 @@ function exchangeRoute(route) {
   ].includes(route);
 }
 
+const arenaUI = createArenaUI({ api, e, notice, user: () => user });
+
 const administrationUI = createAdministrationUI({
   api,
   e,
@@ -1868,7 +2157,10 @@ async function render() {
   try {
     let html;
 
-    if (route === "home") {
+    arenaUI.stop();
+    if (route === "arena" || route.startsWith("arena/")) {
+      html = user ? await arenaUI.render(route) : authPage("login");
+    } else if (route === "home") {
       html = home();
     } else if (route === "explore") {
       html = await explore();
@@ -1913,6 +2205,7 @@ async function render() {
     if (version !== renderVersion) return;
 
     app.innerHTML = html;
+    window.dispatchEvent(new Event("ss-page-ready"));
     wire(route);
 
     if (route === "home") {
@@ -1947,6 +2240,7 @@ async function render() {
 }
 
 function wire(route) {
+  if (route === "arena" || route.startsWith("arena/")) arenaUI.wire();
   if (administrationRoute(route)) {
     administrationUI.wire();
   }
@@ -2033,9 +2327,35 @@ function wire(route) {
     location.hash = "login";
   });
 
-  bind("profile", async (body) => {
-    await api("/profile", "PUT", body);
+  bind("avatar-upload", async (body, element) => {
+    const input = element.querySelector('input[name="avatar"]');
+    const picture = input.files[0];
+
+    if (!picture) throw new Error("Choose a picture.");
+    if (picture.size > 5 * 1024 * 1024) {
+      throw new Error("Picture must be 5 MB or smaller.");
+    }
+
+    await api("/profile/avatar", "POST", new FormData(element));
     await refresh();
+    account();
+    await render();
+    notice("Profile picture updated.");
+  });
+
+  bind("avatar-remove", async () => {
+    await api("/profile/avatar", "DELETE");
+    await refresh();
+    account();
+    await render();
+    notice("Profile picture removed.");
+  });
+
+  bind("profile", async (body) => {
+    const result = await api("/profile", "PUT", body);
+    user = result.user;
+    account();
+    await render();
     notice(s.saved);
   });
 
@@ -2222,3 +2542,476 @@ async function start() {
 }
 
 void start();
+
+// SS HOME SCROLL START
+let ssHomeScrollObserver = null;
+let ssHomeScrollFrame = null;
+
+function ssScrollToHomeSkills() {
+  ssHomeScrollObserver?.disconnect();
+  ssHomeScrollObserver = null;
+
+  if (ssHomeScrollFrame !== null) {
+    cancelAnimationFrame(ssHomeScrollFrame);
+    ssHomeScrollFrame = null;
+  }
+
+  if (location.hash !== "#home?section=skills") return;
+
+  const appContainer = document.querySelector("#app");
+  if (!appContainer) return;
+
+  const findAndScroll = () => {
+    if (location.hash !== "#home?section=skills") {
+      ssHomeScrollObserver?.disconnect();
+      ssHomeScrollObserver = null;
+      return;
+    }
+
+    const target = document.getElementById("ss-home-skills");
+    if (!target) return;
+
+    ssHomeScrollObserver?.disconnect();
+    ssHomeScrollObserver = null;
+
+    ssHomeScrollFrame = requestAnimationFrame(() => {
+      ssHomeScrollFrame = requestAnimationFrame(() => {
+        ssHomeScrollFrame = null;
+
+        if (
+          location.hash !== "#home?section=skills" ||
+          !target.isConnected
+        ) {
+          return;
+        }
+
+        target.scrollIntoView({
+          behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
+            ? "auto"
+            : "smooth",
+          block: "start",
+        });
+      });
+    });
+  };
+
+  ssHomeScrollObserver = new MutationObserver(findAndScroll);
+  ssHomeScrollObserver.observe(appContainer, {
+    childList: true,
+    subtree: true,
+  });
+
+  findAndScroll();
+}
+
+window.addEventListener("hashchange", ssScrollToHomeSkills);
+
+document.addEventListener("click", (event) => {
+  if (
+    event.defaultPrevented ||
+    event.button !== 0 ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.shiftKey ||
+    event.altKey
+  ) {
+    return;
+  }
+
+  const link = event.target instanceof Element
+    ? event.target.closest(
+        'header nav a[href="#home?section=skills"]'
+      )
+    : null;
+
+  if (link && location.hash === "#home?section=skills") {
+    event.preventDefault();
+    ssScrollToHomeSkills();
+  }
+});
+
+ssScrollToHomeSkills();
+// SS HOME SCROLL END
+
+
+// Header unread notification count
+let notificationBadgeBusy = false;
+
+async function updateNotificationBadge() {
+  const badge = document.getElementById("ss-notification-count");
+  const bell = document.getElementById("ss-notification-bell");
+
+  if (!user || !badge || !bell || notificationBadgeBusy) return;
+
+  const accountId = user.id;
+  notificationBadgeBusy = true;
+
+  try {
+    const result = await api("/notifications");
+    if (!user || user.id !== accountId || !badge.isConnected) return;
+
+    const unread = Math.max(0, Number(result.unread) || 0);
+    badge.textContent = unread > 99 ? "99+" : String(unread);
+    badge.hidden = unread === 0;
+    bell.setAttribute(
+      "aria-label",
+      unread ? "Notifications: " + unread + " unread" : "Notifications"
+    );
+    bell.title = unread ? unread + " unread notifications" : "Notifications";
+  } catch {
+    // Keep the last count when a background refresh fails.
+  } finally {
+    notificationBadgeBusy = false;
+  }
+}
+
+setInterval(() => {
+  if (!document.hidden) void updateNotificationBadge();
+}, 30000);
+
+window.addEventListener("focus", () => {
+  void updateNotificationBadge();
+});
+
+window.addEventListener("hashchange", () => {
+  void updateNotificationBadge();
+});
+
+// Refresh after marking a notification as read.
+document.addEventListener("click", event => {
+  if (event.target instanceof Element &&
+      event.target.closest(".notification-read")) {
+    setTimeout(() => void updateNotificationBadge(), 1200);
+  }
+});
+
+
+// Header notification dropdown
+async function loadNotificationDropdown() {
+  const list = document.getElementById("ss-notification-items");
+  if (!list || !user) return;
+  const accountId = user.id;
+  list.textContent = "Loading notifications...";
+
+  try {
+    const data = await api("/notifications");
+    if (!list.isConnected || user?.id !== accountId) return;
+
+    const items = (data.items || []).slice(0, 15);
+    list.innerHTML = items.length
+      ? items.map(n => `
+        <article class="ss-notification-item ${n.read_at ? "" : "is-unread"}">
+          <strong>${e(n.title)}</strong>
+          <small>${e(date(n.created_at))}</small>
+          <div class="ss-notification-actions">
+            <a href="#${e(n.route)}">View details</a>
+            ${n.read_at
+              ? '<span>Read</span>'
+              : '<button type="button" data-ss-notification-read="' + Number(n.id) + '">Mark read</button>'}
+          </div>
+        </article>
+      `).join("")
+      : '<p class="ss-notification-empty">No notifications yet.</p>';
+
+    void updateNotificationBadge();
+  } catch (error) {
+    if (list.isConnected && user?.id === accountId) {
+      list.textContent = error.message;
+    }
+  }
+}
+
+function closeNotificationDropdown() {
+  const popup = document.getElementById("ss-notification-popup");
+  if (popup) popup.hidden = true;
+  document.getElementById("ss-notification-bell")
+    ?.setAttribute("aria-expanded", "false");
+}
+
+document.addEventListener("click", async event => {
+  if (!(event.target instanceof Element)) return;
+  const target = event.target;
+  const popup = document.getElementById("ss-notification-popup");
+  const bell = document.getElementById("ss-notification-bell");
+
+  if (target.closest("#ss-notification-bell")) {
+    if (!popup || !bell) return;
+    popup.hidden = !popup.hidden;
+    bell.setAttribute("aria-expanded", String(!popup.hidden));
+    if (!popup.hidden) {
+      document.querySelector(".ss-account-menu")?.removeAttribute("open");
+      await loadNotificationDropdown();
+    }
+    return;
+  }
+
+  if (target.closest("#ss-notification-refresh")) {
+    await loadNotificationDropdown();
+    return;
+  }
+
+  const readButton = target.closest("[data-ss-notification-read]");
+  if (readButton) {
+    readButton.disabled = true;
+    try {
+      await api("/notifications/" + readButton.dataset.ssNotificationRead + "/read", "POST", {});
+      await loadNotificationDropdown();
+    } catch (error) {
+      notice(error.message);
+    } finally {
+      readButton.disabled = false;
+    }
+    return;
+  }
+
+  if (!target.closest(".ss-notification-wrap") ||
+      target.closest("#ss-notification-popup a")) {
+    closeNotificationDropdown();
+  }
+});
+
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape") {
+    const popup = document.getElementById("ss-notification-popup");
+    if (popup && !popup.hidden) {
+      closeNotificationDropdown();
+      document.getElementById("ss-notification-bell")?.focus();
+    }
+  }
+});
+
+window.addEventListener("hashchange", closeNotificationDropdown);
+
+
+// Close profile menu on outside click
+document.addEventListener("click", event => {
+  const menu = document.querySelector("#account .ss-account-menu");
+  if (!menu || !(event.target instanceof Node)) return;
+
+  if (!menu.contains(event.target) ||
+      (event.target instanceof Element &&
+       event.target.closest(".ss-account-dropdown a"))) {
+    menu.removeAttribute("open");
+  }
+});
+
+document.addEventListener("keydown", event => {
+  const menu = document.querySelector("#account .ss-account-menu");
+  if (event.key === "Escape" && menu?.open) {
+    menu.removeAttribute("open");
+    menu.querySelector("summary")?.focus();
+  }
+});
+
+window.addEventListener("hashchange", () => {
+  document.querySelector("#account .ss-account-menu")
+    ?.removeAttribute("open");
+});
+
+
+// Inline Help support chat
+function mountHelpChat() {
+  const root = document.getElementById("ss-help-chat");
+  if (!root || root.dataset.ready) return;
+  root.dataset.ready = "true";
+
+  if (!user) {
+    root.innerHTML = '<h2>Message Support</h2><p>Sign in to send a message and receive replies.</p><a class="button" href="#login">Sign in</a>';
+    // Retry after the login session has loaded.
+    root.dataset.ready = "";
+    return;
+  }
+
+  const accountId = user.id;
+  let selected = null;
+  let busy = false;
+  let loaded = false;
+
+  root.innerHTML =
+    '<div class="ss-support-heading"><div><h2>Message Support</h2><p>Send a message. Read the admin reply here.</p></div><button type="button" id="ss-support-refresh" class="secondary small">Refresh</button></div>' +
+    '<label>Your conversations<select id="ss-support-select"><option value="">New conversation</option></select></label>' +
+    '<div id="ss-support-thread" role="log" aria-label="Support conversation"></div>' +
+    '<form id="ss-support-form"><label id="ss-support-subject-label">Subject<input name="subject" minlength="2" maxlength="120" required placeholder="What do you need help with?"></label>' +
+    '<label>Message<textarea name="body" minlength="10" maxlength="6000" required rows="3" placeholder="Describe your question (at least 10 characters)"></textarea></label>' +
+    '<p id="ss-support-error" role="status"></p><button type="submit">Send message</button></form>';
+
+  const select = root.querySelector("#ss-support-select");
+  const thread = root.querySelector("#ss-support-thread");
+  const formElement = root.querySelector("#ss-support-form");
+  const subjectLabel = root.querySelector("#ss-support-subject-label");
+  const subject = formElement.elements.subject;
+  const errorBox = root.querySelector("#ss-support-error");
+
+  function alive() {
+    return root.isConnected && user?.id === accountId;
+  }
+
+  async function reload() {
+    if (busy || !alive()) return;
+    busy = true;
+
+    try {
+      const data = await api("/support/tickets");
+      if (!alive()) return;
+
+      const tickets = data.items || [];
+      if (!loaded) {
+        const params = new URLSearchParams(location.hash.split("?")[1] || "");
+        const requested = Number(params.get("ticket"));
+        selected = tickets.some(t => t.id === requested)
+          ? requested
+          : (tickets[0]?.id || null);
+        loaded = true;
+      }
+
+      select.innerHTML = '<option value="">New conversation</option>' +
+        tickets.map(t =>
+          '<option value="' + Number(t.id) + '">' +
+          e(t.subject) + ' ? ' + e(t.status) + '</option>'
+        ).join("");
+      select.value = selected ? String(selected) : "";
+
+      if (!selected) {
+        thread.innerHTML = '<p class="ss-support-empty">Write a message below to start a conversation.</p>';
+        subjectLabel.hidden = false;
+        subject.required = true;
+        formElement.hidden = false;
+        return;
+      }
+
+      const conversationId = selected;
+      const detail = await api("/support/tickets/" + conversationId);
+      if (!alive() || selected !== conversationId) return;
+
+      const ticket = detail.ticket;
+      const messages = [{
+        author_id: ticket.user_id,
+        name: "You",
+        body: ticket.body,
+        created_at: ticket.created_at
+      }].concat(detail.replies || []);
+
+      const previousScroll = thread.scrollTop;
+      const nearBottom =
+        thread.scrollHeight - thread.scrollTop - thread.clientHeight < 60;
+      const previous = thread.innerHTML;
+
+      const html = messages.map(m =>
+        '<article class="ss-support-message ' +
+        (m.author_id === accountId ? 'is-mine' : 'is-support') +
+        '"><strong>' +
+        e(m.author_id === accountId ? "You" : m.name || "Support") +
+        '</strong><p>' + e(m.body) +
+        '</p><small>' + e(date(m.created_at)) + '</small></article>'
+      ).join("") + (ticket.status === "resolved"
+        ? '<p class="ss-support-empty">Resolved. Choose New conversation if you need more help.</p>'
+        : "");
+
+      if (previous !== html) {
+        thread.innerHTML = html;
+        thread.scrollTop = nearBottom ? thread.scrollHeight : previousScroll;
+      }
+
+      subjectLabel.hidden = true;
+      subject.required = false;
+      formElement.hidden = ticket.status === "resolved";
+    } catch (error) {
+      if (alive()) errorBox.textContent = error.message;
+    } finally {
+      busy = false;
+    }
+  }
+
+  select.addEventListener("change", async () => {
+    selected = select.value ? Number(select.value) : null;
+    errorBox.textContent = "";
+    await reload();
+  });
+
+  root.querySelector("#ss-support-refresh").addEventListener("click", reload);
+
+  formElement.addEventListener("submit", async event => {
+    event.preventDefault();
+    const button = formElement.querySelector('button[type="submit"]');
+    if (button.disabled || busy) return;
+
+    button.disabled = true;
+    errorBox.textContent = "";
+
+    try {
+      const body = formElement.elements.body.value.trim();
+      if (body.length < 10) throw new Error("Please write at least 10 characters.");
+
+      if (selected) {
+        await api("/support/tickets/" + selected + "/replies", "POST", { body });
+      } else {
+        const result = await api("/support/tickets", "POST", {
+          subject: subject.value.trim(),
+          body
+        });
+        selected = result.ticket.id;
+      }
+
+      if (!alive()) return;
+      formElement.elements.body.value = "";
+      await reload();
+      thread.scrollTop = thread.scrollHeight;
+      notice("Message sent.");
+    } catch (error) {
+      if (alive()) errorBox.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  const timer = setInterval(() => {
+    if (!alive()) {
+      clearInterval(timer);
+      return;
+    }
+    if (!document.hidden) void reload();
+  }, 10000);
+
+  void reload();
+}
+
+// Mount after Help is rendered; leave typed messages intact while polling.
+const supportMountObserver = new MutationObserver(mountHelpChat);
+const supportApp = document.getElementById("app");
+if (supportApp) supportMountObserver.observe(supportApp, { childList: true });
+setInterval(mountHelpChat, 2000);
+mountHelpChat();
+
+
+// Service page back navigation
+function addServiceBackButton() {
+  const app = document.getElementById("app");
+  if (!app || app.querySelector(".ss-service-back")) return;
+
+  const route = location.hash.slice(1).split("?")[0];
+  const destinations = {
+    "explore": ["home?section=skills", "Back to skills"],
+    "dashboard/new": ["home?section=skills", "Back to skills"],
+    "dashboard/matches": ["home?section=skills", "Back to skills"],
+    "dashboard/preferences": ["dashboard/matches", "Back to exchanges"]
+  };
+
+  const destination = destinations[route];
+  if (!destination) return;
+
+  const link = document.createElement("a");
+  link.className = "ss-service-back";
+  link.href = "#" + destination[0];
+  link.textContent = "\u2190 " + destination[1];
+  app.prepend(link);
+}
+
+const serviceBackApp = document.getElementById("app");
+if (serviceBackApp) {
+  new MutationObserver(addServiceBackButton).observe(
+    serviceBackApp, { childList: true }
+  );
+}
+
+window.addEventListener("hashchange", addServiceBackButton);
+addServiceBackButton();

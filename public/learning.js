@@ -1,3 +1,4 @@
+import {wireSessionTimers} from "./session-timer.js";
 export function createLearningUI({
   api,
   e,
@@ -135,9 +136,20 @@ export function createLearningUI({
           >${complete ? "Completed" : kind === "booking" ? e(s.learning_status) : "Exchange session"}</span
         >
       </div>
-      ${s.meeting_url ? /* HTML */ `<a class="button secondary small" href="${e(s.meeting_url)}" target="_blank" rel="noopener noreferrer">Open external meeting ↗</a>` : "<p>No meeting link saved yet.</p>"}
+      <div data-class-clock data-kind="${kind}" data-session="${s.id}"
+       data-teacher="${teacher}"
+       style="margin:20px 0;padding:20px;border:1px solid #dce4d9;border-radius:10px;background:#f7f8f3">
+       <h4 style="margin:0 0 12px">Class session</h4>
+       <p data-clock-status role="status">Loading session timer...</p>
+       <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <button type="button" class="secondary small" data-clock-action="join">Join class</button>
+        <button type="button" class="small" data-clock-action="start">Confirm Start session</button>
+        <button type="button" class="secondary small" data-clock-action="problem">Report class problem</button>
+        <button type="button" class="secondary small" data-clock-refresh hidden>Refresh delivery controls</button>
+       </div>
+      </div>
       <p class="muted">
-        External meeting service. Opening the link does not record attendance.
+        Join records a click, not verified meeting attendance. The timer starts after both people confirm. Keep this room open in another tab.
       </p>
       ${teacher && editable ? `<details><summary>Manage meeting link</summary>${form("meeting-" + kind + "-" + s.id, /* HTML */ `<label>HTTPS meeting URL (leave blank to remove)<input type="url" name="meeting_url" value="${e(s.meeting_url)}" placeholder="https://meet.example.com/your-room" /></label>`, "Save meeting link")}</details>` : ""}
       ${
@@ -514,6 +526,7 @@ ${e(ownAttendance?.note)}</textarea>
     return learningRoom(kind, Number(id));
   }
   function wire() {
+    wireSessionTimers({api,notice,reload});
     document
       .querySelectorAll(".refresh-room")
       .forEach((b) => b.addEventListener("click", reload));

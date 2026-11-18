@@ -1,3 +1,4 @@
+import {assertSessionTime} from "./session-timer.js";
 import { z } from "zod";
 import { transaction } from "./db.js";
 import { matchStudents, normalizeSkill } from "./matching.js";
@@ -43,6 +44,74 @@ export async function checkSchedule(c, x, sessions) {
   }
 }
 export function mountExchanges(app, { db, login, approved, admin }) {
+
+  // Published exchange offers
+  app.get("/api/exchange/offers", login, async (req, res) => {
+    const items = (await db.query(
+      "SELECT o.user_id,o.skills,o.availability,o.updated_at,u.name,u.institution FROM exchange_offers o JOIN users u ON u.id=o.user_id WHERE o.published=true AND u.role='student' AND u.suspended=false AND u.profile_public=true ORDER BY o.updated_at DESC,o.user_id DESC LIMIT 200"
+    )).rows;
+
+    res.json({ items, timezone: "Asia/Dhaka" });
+  });
+
+  app.put("/api/exchange/offers/mine", login, async (req, res) => {
+    z.object({ confirmed: z.literal(true) }).parse(req.body);
+
+    await transaction(db, async (c) => {
+      const person = (await c.query(
+        "SELECT role,suspended,profile_public FROM users WHERE id=$1 FOR UPDATE",
+        [req.user.id]
+      )).rows[0];
+
+      if (!person || person.role !== "student" || person.suspended) {
+        throw fail(403, "An active student account is required.");
+      }
+
+      if (!person.profile_public) {
+        throw fail(400, "Enable public profile in Account & Privacy before publishing.");
+      }
+
+      const skills = (await c.query(
+        "SELECT skill,kind,level FROM skill_preferences WHERE user_id=$1 ORDER BY kind,skill",
+        [req.user.id]
+      )).rows;
+
+      const availability = (await c.query(
+        "SELECT weekday,start_minute,end_minute FROM exchange_availability WHERE user_id=$1 ORDER BY weekday,start_minute",
+        [req.user.id]
+      )).rows;
+
+      if (!skills.some(s => s.kind === "teach") ||
+          !skills.some(s => s.kind === "learn")) {
+        throw fail(400, "Add at least one skill to teach and one skill to learn.");
+      }
+
+      if (!availability.length) {
+        throw fail(400, "Add at least one availability window.");
+      }
+
+      await c.query(
+        "INSERT INTO exchange_offers(user_id,skills,availability,published) VALUES($1,$2,$3,true) ON CONFLICT(user_id) DO UPDATE SET skills=EXCLUDED.skills,availability=EXCLUDED.availability,published=true,updated_at=now()",
+        [
+          req.user.id,
+          JSON.stringify(skills),
+          JSON.stringify(availability)
+        ]
+      );
+    });
+
+    res.json({ message: "Your exchange offer is published." });
+  });
+
+  app.delete("/api/exchange/offers/mine", login, async (req, res) => {
+    await db.query(
+      "UPDATE exchange_offers SET published=false,updated_at=now() WHERE user_id=$1",
+      [req.user.id]
+    );
+    res.json({ message: "Your exchange offer is unpublished." });
+  });
+
+
   app.get("/api/exchange/preferences", login, async (req, res) =>
     res.json({
       skills: (
@@ -405,6 +474,7 @@ export function mountExchanges(app, { db, login, approved, admin }) {
           s.teacher_id === req.user.id
             ? "teacher_completed"
             : "learner_confirmed";
+        if(field==="teacher_completed") await assertSessionTime(c,"exchange-session",s.id);
         if (field === "learner_confirmed" && !s.teacher_completed)
           throw fail(409, "Wait for the Student Mentor to record completion.");
         if (s[field]) throw fail(409, "You already recorded this action.");

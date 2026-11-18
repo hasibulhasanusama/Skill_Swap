@@ -1,3 +1,4 @@
+import {startSessionTimerWorker} from "./session-timer.js";
 import "dotenv/config";
 import session from "express-session";
 import pgSession from "connect-pg-simple";
@@ -18,6 +19,7 @@ if (process.env.NODE_ENV === "production") {
 await pool.query("SELECT id FROM platform_policies WHERE id=1");
 const store = new (pgSession(session))({ pool, tableName: "session" });
 const app = createApp({ db: pool, store });
+const stopSessionTimers=startSessionTimerWorker(pool);
 const server = app.listen(process.env.PORT || 3000, () =>
   console.log(
     `Skill Swap: ${process.env.APP_ORIGIN || "http://localhost:3000"}`,
@@ -27,6 +29,7 @@ let closing = false;
 function shutdown() {
   if (closing) return;
   closing = true;
+  stopSessionTimers();
   const timeout = setTimeout(() => process.exit(1), 10000);
   timeout.unref();
   server.close(async () => {

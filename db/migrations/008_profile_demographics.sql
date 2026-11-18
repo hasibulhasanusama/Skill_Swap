@@ -1,0 +1,6 @@
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS age INTEGER
+  CHECK (age BETWEEN 1 AND 120);
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS gender TEXT NOT NULL DEFAULT ''
+  CHECK (gender IN ('', 'male', 'female'));
