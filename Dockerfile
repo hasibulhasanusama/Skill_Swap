@@ -9,4 +9,4 @@ COPY --chown=node:node public ./public
 RUN mkdir -p storage/private && chown -R node:node storage
 USER node
 EXPOSE 3000
-CMD ["node", "server/index.js"]
+CMD ["sh", "-c", "node scripts/migrate.js && exec node server/index.js"]
