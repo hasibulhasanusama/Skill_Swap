@@ -10,3 +10,20 @@ backups/
 .env.*
 !.env.example
 *.log
+
+# Local backups and secrets
+*.backup-*
+*.bak
+arena-backup-*/
+.env
+.env.*
+!.env.example
+node_modules/
+.vercel/
+storage/
+/skill-swap/
+
+# Exclude all local backups
+*.backup-*
+*.bak
+arena-backup-*/
