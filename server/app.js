@@ -1,3 +1,5 @@
+import { assistantChat } from "./assistant-chat.js";
+import { mountArena } from "./arena.js";
 import { fileURLToPath } from "node:url";
 import { mountAdministration } from "./administration.js";
 import { loadPolicy } from "./policies.js";
@@ -53,6 +55,7 @@ export function createApp({
   storageDir = process.env.STORAGE_DIR || "./storage/private",
   secret = process.env.SESSION_SECRET,
   storageAdapter,
+  arenaServices,
   completionResponseHours = Number(process.env.COMPLETION_RESPONSE_HOURS || 72),
   commissionBps = Number(process.env.COMMISSION_BPS || 1000),
   webhookSecret = process.env.SANDBOX_WEBHOOK_SECRET || secret,
@@ -175,6 +178,12 @@ export function createApp({
   });
   const login = (req, res, next) =>
     req.user ? next() : next(fail(401, "Please sign in."));
+  const skillAssistantLimit = rateLimit({
+    windowMs: 60000,
+    limit: 10,
+    message: { error: "এক মিনিট পরে আবার চেষ্টা করুন।" },
+  });
+  app.post("/api/skill-assistant/chat", login, skillAssistantLimit, assistantChat);
   const approved = (req, res, next) =>
     !req.user
       ? next(fail(401, "Please sign in."))
@@ -313,62 +322,211 @@ export function createApp({
     });
     res.json({ message: "Password changed. Sign in again." });
   });
+
   app.put("/api/profile", login, async (req, res) => {
-    const b = z
-      .object({ name: text, institution: text, bio: z.string().max(2000) })
-      .parse(req.body);
-    const u = (
-      await db.query(
-        "UPDATE users SET name=$1,institution=$2,bio=$3 WHERE id=$4 RETURNING *",
-        [b.name, b.institution, b.bio, req.user.id],
-      )
-    ).rows[0];
+    const b = z.object({
+      name: text,
+      institution: text,
+      bio: z.string().max(2000),
+      phone: z.string().trim().max(25)
+        .regex(/^[+0-9() -]*$/, "Enter a valid phone number.")
+        .optional(),
+      age: z.preprocess(
+        value => value === "" || value == null ? null : Number(value),
+        z.number().int().min(1).max(120).nullable()
+      ),
+      gender: z.enum(["", "male", "female"]).optional(),
+      email: z.email().max(254).optional()
+    }).parse(req.body);
+
+    const email = b.email?.trim().toLowerCase();
+
+    if (email) {
+      const existing = await db.query(
+        "SELECT id FROM users WHERE lower(email)=$1 AND id<>$2",
+        [email, req.user.id]
+      );
+      if (existing.rows.length) {
+        throw fail(409, "This email is already used by another account.");
+      }
+    }
+
+    let u;
+    try {
+      u = (await db.query(
+        "UPDATE users SET name=$1,institution=$2,bio=$3,phone=COALESCE($4,phone),age=$5,gender=COALESCE($6,gender),email=COALESCE($7,email) WHERE id=$8 RETURNING *",
+        [
+          b.name, b.institution, b.bio, b.phone ?? null,
+          b.age, b.gender ?? null, email ?? null, req.user.id
+        ]
+      )).rows[0];
+    } catch (error) {
+      if (error.code === "23505") {
+        throw fail(409, "This email is already in use.");
+      }
+      throw error;
+    }
+
     res.json({ user: publicUser(u) });
   });
   const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 5 * 1024 * 1024, files: 1 },
   });
+
+  // Current account profile picture
+  app.get("/api/profile/avatar", login, async (req, res) => {
+    const u = (await db.query(
+      "SELECT avatar_key,avatar_mime FROM users WHERE id=$1",
+      [req.user.id]
+    )).rows[0];
+
+    if (!u?.avatar_key) throw fail(404, "No profile picture.");
+    const bytes = await fileStorage.read(u.avatar_key);
+    res.set("Cache-Control", "private, no-store");
+    res.set("X-Content-Type-Options", "nosniff");
+    res.type(u.avatar_mime).send(bytes);
+  });
+
+  app.post(
+    "/api/profile/avatar",
+    login,
+    upload.single("avatar"),
+    async (req, res) => {
+      if (!req.file) throw fail(400, "Choose a PNG or JPEG picture.");
+
+      const mime = documentType(req.file.buffer);
+      if (!["image/png", "image/jpeg"].includes(mime)) {
+        throw fail(400, "Only PNG and JPEG pictures are supported.");
+      }
+
+      const key = await fileStorage.put(req.file.buffer);
+      let result;
+
+      try {
+        result = await transaction(db, async (c) => {
+          const previous = (await c.query(
+            "SELECT avatar_key FROM users WHERE id=$1 FOR UPDATE",
+            [req.user.id]
+          )).rows[0];
+
+          const updated = (await c.query(
+            "UPDATE users SET avatar_key=$1,avatar_mime=$2,avatar_updated_at=now() WHERE id=$3 RETURNING *",
+            [key, mime, req.user.id]
+          )).rows[0];
+
+          return { previous: previous.avatar_key, updated };
+        });
+      } catch (error) {
+        await fileStorage.delete(key).catch(() => {});
+        throw error;
+      }
+
+      if (result.previous) {
+        await fileStorage.delete(result.previous).catch(() => {});
+      }
+
+      res.json({
+        user: publicUser(result.updated),
+        message: "Profile picture updated."
+      });
+    }
+  );
+
+  app.delete("/api/profile/avatar", login, async (req, res) => {
+    const result = await transaction(db, async (c) => {
+      const previous = (await c.query(
+        "SELECT avatar_key FROM users WHERE id=$1 FOR UPDATE",
+        [req.user.id]
+      )).rows[0];
+
+      const updated = (await c.query(
+        "UPDATE users SET avatar_key=NULL,avatar_mime=NULL,avatar_updated_at=now() WHERE id=$1 RETURNING *",
+        [req.user.id]
+      )).rows[0];
+
+      return { previous: previous.avatar_key, updated };
+    });
+
+    if (result.previous) {
+      await fileStorage.delete(result.previous).catch(() => {});
+    }
+
+    res.json({
+      user: publicUser(result.updated),
+      message: "Profile picture removed."
+    });
+  });
+
+
   app.post(
     "/api/verification",
     login,
     upload.single("document"),
     async (req, res) => {
-      if (req.user.role !== "student" || req.user.verification === "approved")
-        throw fail(409, "Verification is not available for this account.");
+      if (req.user.role !== "student") {
+        throw fail(403, "Student verification is for student accounts.");
+      }
+
+      // Automatic competition demo approval
+      const studentId = String(req.body.student_id || "").trim();
+      if (!/^\d{3}-\d{2}-\d{3}$/.test(studentId)) {
+        throw fail(400, "Enter a Student ID like 242-35-350.");
+      }
+
       const f = req.file;
       if (!f) throw fail(400, "Choose a PDF, PNG, or JPEG student ID.");
+
       const type = documentType(f.buffer);
       if (!type) throw fail(400, "Unsupported document content.");
+
       const key = await fileStorage.put(f.buffer);
+
       try {
         await transaction(db, async (c) => {
-          await c.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [
-            req.user.id,
-          ]);
-          const file = (
-            await c.query(
-              "INSERT INTO files(owner_id,storage_key,original_name,mime_type,size_bytes) VALUES($1,$2,$3,$4,$5) RETURNING id",
-              [req.user.id, key, safeFilename(f.originalname), type, f.size],
-            )
-          ).rows[0];
           await c.query(
-            "INSERT INTO verifications(user_id,file_id) VALUES($1,$2)",
-            [req.user.id, file.id],
+            "SELECT id FROM users WHERE id=$1 FOR UPDATE",
+            [req.user.id]
           );
-          await c.query("UPDATE users SET verification='pending' WHERE id=$1", [
-            req.user.id,
-          ]);
+
+          const file = (await c.query(
+            "INSERT INTO files(owner_id,storage_key,original_name,mime_type,size_bytes) VALUES($1,$2,$3,$4,$5) RETURNING id",
+            [req.user.id, key, safeFilename(f.originalname), type, f.size]
+          )).rows[0];
+
+          const pending = (await c.query(
+            "SELECT id FROM verifications WHERE user_id=$1 AND status='pending' FOR UPDATE",
+            [req.user.id]
+          )).rows[0];
+
+          if (pending) {
+            await c.query(
+              "UPDATE verifications SET file_id=$1,student_id=$2,status='approved',reason=$3,reviewer_id=NULL,reviewed_at=now() WHERE id=$4",
+              [file.id, studentId, "Demo approval: ID format and document submission only. Identity not authenticated.", pending.id]
+            );
+          } else {
+            await c.query(
+              "INSERT INTO verifications(user_id,file_id,student_id,status,reason,reviewed_at) VALUES($1,$2,$3,'approved',$4,now())",
+              [req.user.id, file.id, studentId, "Demo approval: ID format and document submission only. Identity not authenticated."]
+            );
+          }
+
+          await c.query(
+            "UPDATE users SET verification='approved',student_id=$2 WHERE id=$1",
+            [req.user.id, studentId]
+          );
         });
-      } catch (e) {
-        await fileStorage.delete(key);
-        throw e;
+      } catch (error) {
+        await fileStorage.delete(key).catch(() => {});
+        throw error;
       }
-      res
-        .status(201)
-        .json({ message: "Student ID submitted for manual review." });
-    },
+
+      res.status(201).json({
+        message: "Demo approved. Student ID format and document submission accepted; identity is not authenticated."
+      });
+    }
   );
+
   app.get("/api/verification", login, async (req, res) =>
     res.json({
       items: (
@@ -748,6 +906,7 @@ export function createApp({
       ).rows,
     }),
   );
+  mountArena(app, { db, login, upload, storage: fileStorage, services: arenaServices });
   mountExchanges(app, { db, login, approved, admin });
   mountLearning(app, {
     db,

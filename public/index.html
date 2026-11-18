@@ -10,16 +10,16 @@
 
     <meta
       name="description"
-      content="Skill Swap — student-led learning, teaching, and skill exchange."
+      content="Skill Swap — a student community to learn new skills, share knowledge, and grow together."
     />
 
-    <meta name="theme-color" content="#245c4b" />
+    <meta name="theme-color" content="#245c49" />
 
     <title>Skill Swap · Learn from each other</title>
 
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23245c4b'/%3E%3Ctext x='32' y='45' text-anchor='middle' font-family='Arial,sans-serif' font-size='42' font-weight='700' fill='white'%3ES%3C/text%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23245c49'/%3E%3Ctext x='32' y='45' text-anchor='middle' font-family='Arial,sans-serif' font-size='42' font-weight='700' fill='white'%3ES%3C/text%3E%3C/svg%3E"
     />
 
     <link rel="stylesheet" href="/styles.css" />
@@ -33,173 +33,111 @@
     <link rel="modulepreload" href="/exchanges.js" />
 
     <script type="module" src="/app.js"></script>
-  </head>
+  <link rel="stylesheet" href="/startup-loader.css">
+<link rel="stylesheet" href="/arena.css">
+    <link rel="stylesheet" href="/skill-assistant.css" />
+    <script type="module" src="/skill-assistant.js"></script>
+</head>
 
   <body>
+
+    <div id="ss-startup-loader" role="status"
+      aria-live="polite" aria-label="Loading Skill Swap">
+      <div class="ss-loader-content">
+        <div class="ss-loader-brand-row"><div class="ss-loader-logo" aria-hidden="true">S</div><div class="ss-loader-name">Skill Swap</div></div>
+        <p class="ss-loader-tagline">Learn, Teach &amp; Grow Together</p>
+        <div class="ss-loader-track" aria-hidden="true">
+          <span></span>
+        </div>
+        
+      </div>
+    </div>
+    <script src="/startup-loader.js"></script>
+    <noscript>
+      <style>#ss-startup-loader { display: none !important; }</style>
+    </noscript>
+
+    <!-- Header -->
     <header>
-      <a class="brand" href="#home">
-        <span class="mark">
-          S
-        </span>
-        Skill Swap
+      <a class="brand" href="#home" aria-label="Skill Swap home">
+        <span class="mark" aria-hidden="true">S</span>
+        <span>Skill Swap</span>
       </a>
 
+      <!-- Main navigation -->
       <nav aria-label="Main navigation">
-        <a href="#explore">Explore skills</a>
+        <a href="#home">Home</a>
+        <a href="#home?section=skills">Explore skills</a>
         <a href="#exchange">How exchange works</a>
         <a href="#announcements">Announcements</a>
         <a href="#help">Help</a>
       </nav>
 
+      <!-- Updated by app.js after checking the login session -->
       <div id="account">
         <a href="#login">Sign in</a>
+
         <a class="button small" href="#register">
-          Join Skill Swap ↗
+          Join Skill Swap
         </a>
       </div>
     </header>
 
+    <!--
+      app.js renders the current page here.
+
+      The home page layout belongs in the home() function.
+      Other routes also use this same container.
+    -->
     <main id="app" tabindex="-1">
-      <section class="hero">
-        <div>
-          <div class="eyebrow">
-            A CAMPUS FULL OF POSSIBILITIES
-          </div>
-
-          <h1>
-            Learn something new.<br />
-            <em>
-              From someone<br />
-              like you.
-            </em>
-          </h1>
-
-          <p>
-            Find a student who can help you take the next step.
-            Book a focused session, share your own skills, or
-            learn from each other through an exchange.
-          </p>
-
-          <div class="actions">
-            <a class="button" href="#explore">
-              Find your next skill ↗
-            </a>
-
-            <a class="button secondary" href="#exchange">
-              Explore skill exchange
-            </a>
-          </div>
-
-          <div class="checks">
-            <span>✓ Students only</span>
-            <span>✓ Practical learning</span>
-          </div>
-        </div>
-
-        <div class="hero-art">
-          <div class="art-top">
-            <span>Better, together</span>
-            <span class="exchange-tag">SKILL EXCHANGE</span>
-          </div>
-
-          <div class="mini">
-            <span class="avatar">AR</span>
-
-            <div>
-              <strong>I can teach web design.</strong>
-              <small>
-                I want to learn presentation skills.
-              </small>
-            </div>
-          </div>
-
-          <div class="exchange-arrow">↕</div>
-
-          <div class="mini">
-            <span class="avatar">NA</span>
-
-            <div>
-              <strong>I can teach public speaking.</strong>
-              <small>
-                I want to build my first website.
-              </small>
-            </div>
-          </div>
-
-          <div class="art-foot">
-            An example of what you can learn from each other
-          </div>
-        </div>
-      </section>
-
-      <div class="strip">
-        <div>
-          <strong>01 / Learn a Skill</strong>
-          <p>
-            Focused sessions at student-friendly prices.
-          </p>
-        </div>
-
-        <div>
-          <strong>02 / Teach a Skill</strong>
-          <p>
-            Turn your experience into someone's next step.
-          </p>
-        </div>
-
-        <div>
-          <strong>03 / Exchange a Skill</strong>
-          <p>
-            Share what you know. Learn something new.
-          </p>
-        </div>
-      </div>
-
-      <div class="section-heading">
-        <div>
-          <div class="eyebrow">
-            FIND YOUR STARTING POINT
-          </div>
-
-          <h2>Skills worth making time for</h2>
-        </div>
-
-        <a href="#explore">View all skills →</a>
-      </div>
-
-      <div
-        class="grid"
-        id="home-skills"
-        aria-live="polite"
-        aria-busy="true"
-      >
-        <p>Loading available skills…</p>
-      </div>
+      <p role="status">Loading Skill Swap…</p>
     </main>
 
+    <!-- JavaScript-disabled message -->
     <noscript>
       <div class="panel">
-        Please enable JavaScript to explore skills,
-        sign in, and book sessions.
+        Please enable JavaScript to explore skills, sign in,
+        and book sessions.
       </div>
     </noscript>
 
+    <!-- Notifications -->
     <div
       id="notice"
       role="status"
       aria-live="polite"
+      aria-atomic="true"
     ></div>
 
-    <footer>
-      <a class="brand" href="#home">Skill Swap</a>
+    <!-- Footer -->
+<footer>
+  <div class="footer-top">
+    <div class="footer-brand">
+      <a class="brand" href="#home" aria-label="Skill Swap home">
+        <span class="mark" aria-hidden="true">S</span>
+        <span>Skill Swap</span>
+      </a>
+      <p>Learn. Share. Grow Together.</p>
+    </div>
 
-      <span>
-        Students helping students move forward.
-      </span>
+    <div class="footer-links">
+      <h4>Quick Links</h4>
+      <a href="#explore">Explore Skills</a>
+      <a href="#exchange">How Exchange Works</a>
+      <a href="#announcements">Announcements</a>
+    </div>
 
-      <a href="#policies">Platform policies</a>
+    <div class="footer-links">
+      <h4>Support</h4>
+      <a href="#help">Help & FAQ</a>
+      <a href="#policies">Platform Policies</a>
+    </div>
+  </div>
 
-      <span>Student project · Demo environment</span>
-    </footer>
+  <div class="footer-bottom">
+    <span>© 2026 Skill Swap. All rights reserved.</span>
+    <span>Built by students · Competition demo</span>
+  </div>
+</footer>
   </body>
 </html>

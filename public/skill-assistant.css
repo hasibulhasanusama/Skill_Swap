@@ -1,0 +1,466 @@
+.ss-ai-launcher, .ss-ai-chat { position: fixed; z-index: 1100; }
+.ss-ai-widget .ss-ai-launcher {
+  width: 58px; height: 58px; border-radius: 50%; touch-action: none;
+  background: #195546; color: white; cursor: grab; border: 2px solid #e0f2e8;
+  box-shadow: 0 5px 20px #173c3660;
+}
+.ss-ai-widget .ss-ai-chat {
+  box-sizing: border-box; width: min(370px, calc(100vw - 16px));
+  max-height: calc(100dvh - 16px); overflow: auto; padding: 14px;
+  color: #163e34; background: #fcfefa; border: 1px solid #a8c9ba;
+  border-radius: 16px; box-shadow: 0 12px 32px #163e3440;
+}
+.ss-ai-widget .ss-ai-chat[hidden] { display: none; }
+.ss-ai-widget .ss-ai-row { display: flex; align-items: center; gap: 7px; margin-block: 6px; }
+.ss-ai-widget .ss-ai-row strong, .ss-ai-widget input { flex: 1; min-width: 0; }
+.ss-ai-widget .ss-ai-log { max-height: 35dvh; overflow: auto; }
+.ss-ai-widget .ss-ai-log p {
+  margin: 6px 0; padding: 8px; border-radius: 8px; background: #e9f4ed;
+  overflow-wrap: anywhere; white-space: pre-wrap;
+}
+
+/* Skill Swap robot mascot */
+:is(.ss-ai, .ss-ai-widget) :is(.ss-ai-launch, .ss-ai-launcher) {
+  width: 76px;
+  height: 76px;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  background: transparent url("/skill-swap-robot.webp") center / contain no-repeat;
+  box-shadow: none;
+  font-size: 0;
+  filter: drop-shadow(0 4px 5px #2115473d);
+}
+:is(.ss-ai, .ss-ai-widget) :is(.ss-ai-launch, .ss-ai-launcher):focus-visible {
+  outline: 2px solid #6639c4;
+  outline-offset: 2px;
+}
+:is(.ss-ai, .ss-ai-widget) :is(.ss-ai-panel, .ss-ai-chat) {
+  border-top: 3px solid #7945d0;
+}
+
+
+/* Skill Swap premium chat */
+:is(.ss-ai, .ss-ai-widget) :is(.ss-ai-panel, .ss-ai-chat) {
+  box-sizing: border-box;
+  width: min(390px, calc(100vw - 16px));
+  max-height: calc(100dvh - 16px);
+  padding: 0;
+  overflow: auto;
+  background: #fcfbff;
+  color: #211a37;
+  border: 1px solid #ded5f3;
+  border-radius: 22px;
+  box-shadow: 0 20px 50px #25174730, 0 3px 12px #25174716;
+  font-family: system-ui, sans-serif;
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) > :is(.ss-ai-heading, .ss-ai-row):first-child {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 14px;
+  color: white;
+  background: linear-gradient(125deg, #32205f, #6435bb);
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) > :is(.ss-ai-heading, .ss-ai-row):first-child::before {
+  content: "";
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  background: #ffffff26 url("/skill-swap-robot.webp") center / 35px auto no-repeat;
+  border: 1px solid #ffffff45;
+  border-radius: 13px;
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) :is(.ss-ai-heading, .ss-ai-row) strong {
+  flex: 1;
+  font-size: 16px;
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) [data-close] {
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: 1px solid #ffffff55;
+  border-radius: 11px;
+  background: #ffffff1c;
+  color: #fff;
+  font-size: 22px;
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) .ss-ai-log {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: min(200px, 27dvh);
+  max-height: min(300px, 39dvh);
+  padding: 16px 14px;
+  overflow-y: auto;
+  background: #f8f6ff;
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) .ss-ai-log p[data-sender] {
+  position: relative;
+  width: fit-content;
+  max-width: 83%;
+  margin: 0;
+  padding: 10px 13px;
+  font-size: 14px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) .ss-ai-log p[data-sender="bot"] {
+  align-self: flex-start;
+  margin-left: 32px;
+  background: #fff;
+  color: #242036;
+  border: 1px solid #e4dcf4;
+  border-radius: 5px 16px 16px 16px;
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) .ss-ai-log p[data-sender="bot"]::before {
+  content: "";
+  position: absolute;
+  left: -33px;
+  top: 1px;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: #ede5fb url("/skill-swap-robot.webp") center / 23px auto no-repeat;
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) .ss-ai-log p[data-sender="user"] {
+  align-self: flex-end;
+  background: #5932a5;
+  color: #fff;
+  border-radius: 16px 5px 16px 16px;
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) form {
+  margin: 0;
+  padding: 12px 13px 8px;
+  background: #fff;
+  border-top: 1px solid #eee8f8;
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) form input {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  margin: 0;
+  padding: 8px 11px;
+  border: 1px solid #ded6ed;
+  border-radius: 12px;
+  background: #faf8ff;
+  color: #211a37;
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) form button[type="submit"] {
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: #5932a5;
+  color: #fff;
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) form :is(select, [data-mic], [data-read]) {
+  min-height: 34px;
+  padding: 5px 9px;
+  border: 1px solid #ded6ed;
+  border-radius: 10px;
+  background: #f5f0ff;
+  color: #422579;
+  font-size: 12px;
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) :is(button, input, select):focus-visible {
+  outline: 2px solid #7543cd;
+  outline-offset: 2px;
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) [role="status"]:not(:empty) {
+  margin: 0;
+  padding: 4px 13px 12px;
+  background: #fff;
+  color: #4f3879;
+  font-size: 12px;
+}
+
+
+/* Skill Swap sage chat */
+:is(.ss-ai, .ss-ai-widget) {
+  --ss-chat-forest: #245c49;
+  --ss-chat-ink: #183c31;
+  --ss-chat-sage: #edf3eb;
+  --ss-chat-cream: #fbfaf5;
+  --ss-chat-line: #d8e4d9;
+}
+
+:is(.ss-ai, .ss-ai-widget) :is(.ss-ai-launch, .ss-ai-launcher) {
+  filter: drop-shadow(0 5px 7px #245c4945);
+}
+
+:is(.ss-ai, .ss-ai-widget) :is(.ss-ai-panel, .ss-ai-chat) {
+  box-sizing: border-box;
+  width: min(400px, calc(100vw - 16px));
+  max-height: calc(100dvh - 16px);
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--ss-chat-line);
+  border-radius: 22px;
+  background: var(--ss-chat-cream);
+  color: var(--ss-chat-ink);
+  box-shadow: 0 20px 48px #183c312c, 0 4px 12px #183c3112;
+  font-family: inherit;
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) > :is(.ss-ai-heading, .ss-ai-row):first-child {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 0;
+  padding: 12px 14px;
+  background: linear-gradient(125deg, #193f34, #326b55);
+  color: #fff;
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) > :is(.ss-ai-heading, .ss-ai-row):first-child::before {
+  content: "";
+  flex: 0 0 42px;
+  height: 42px;
+  border: 1px solid #ffffff45;
+  border-radius: 14px;
+  background: #ffffff24 url("/skill-swap-robot.webp") center / 34px auto no-repeat;
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) :is(.ss-ai-heading, .ss-ai-row) strong {
+  flex: 1;
+  color: inherit;
+  font-size: 16px;
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) [data-close] {
+  min-width: 38px;
+  min-height: 38px;
+  padding: 0;
+  border: 1px solid #ffffff55;
+  border-radius: 12px;
+  background: #ffffff1c;
+  color: #fff;
+  font-size: 22px;
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) .ss-ai-log {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: min(200px, 28dvh);
+  max-height: min(310px, 40dvh);
+  padding: 16px 14px;
+  overflow-y: auto;
+  background: linear-gradient(180deg, var(--ss-chat-sage), var(--ss-chat-cream));
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) .ss-ai-log p[data-sender] {
+  position: relative;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: fit-content;
+  max-width: 82%;
+  margin: 0;
+  padding: 10px 13px;
+  font-size: 14px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) .ss-ai-log p[data-sender="bot"] {
+  align-self: flex-start;
+  margin-left: 34px;
+  border: 1px solid var(--ss-chat-line);
+  border-radius: 5px 17px 17px 17px;
+  background: #fff;
+  color: var(--ss-chat-ink);
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) .ss-ai-log p[data-sender="bot"]::before {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: -35px;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: #dae9dd url("/skill-swap-robot.webp") center / 23px auto no-repeat;
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) .ss-ai-log p[data-sender="user"] {
+  align-self: flex-end;
+  border-radius: 17px 5px 17px 17px;
+  background: var(--ss-chat-forest);
+  color: #fff;
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) form {
+  margin: 0;
+  padding: 12px 13px 10px;
+  border-top: 1px solid var(--ss-chat-line);
+  background: var(--ss-chat-cream);
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) form input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--ss-chat-line);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ss-chat-ink);
+  font-size: 16px;
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) form button[type="submit"] {
+  min-height: 44px;
+  padding: 8px 13px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--ss-chat-forest);
+  color: #fff;
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) form button[type="submit"]:disabled {
+  opacity: .65;
+  cursor: wait;
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) form :is(select, [data-mic], [data-read]) {
+  min-height: 36px;
+  margin: 0;
+  padding: 5px 9px;
+  border: 1px solid var(--ss-chat-line);
+  border-radius: 10px;
+  background: var(--ss-chat-sage);
+  color: var(--ss-chat-ink);
+  font-size: 13px;
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) :is(button, input, select):focus-visible {
+  outline: 2px solid #428663;
+  outline-offset: 2px;
+}
+
+:is(.ss-ai, .ss-ai-widget) :is(.ss-ai-launch, .ss-ai-launcher):focus-visible {
+  outline: 2px solid #428663;
+  outline-offset: 2px;
+}
+
+:is(.ss-ai-panel, .ss-ai-chat) [role="status"]:not(:empty) {
+  margin: 0;
+  padding: 4px 13px 12px;
+  background: var(--ss-chat-cream);
+  color: var(--ss-chat-ink);
+  font-size: 13px;
+}
+
+
+/* Skill Swap green robot */
+:is(.ss-ai, .ss-ai-widget) :is(.ss-ai-launch, .ss-ai-launcher),
+:is(.ss-ai-panel, .ss-ai-chat) > :is(.ss-ai-heading, .ss-ai-row):first-child::before,
+:is(.ss-ai-panel, .ss-ai-chat) .ss-ai-log p[data-sender="bot"]::before {
+  filter: hue-rotate(195deg) saturate(.72);
+}
+:is(.ss-ai, .ss-ai-widget) :is(.ss-ai-launch, .ss-ai-launcher):hover {
+  filter: hue-rotate(195deg) saturate(.72) drop-shadow(0 5px 7px #245c4960);
+}
+
+
+/* Skill Swap bilingual chat */
+:is(.ss-ai-panel, .ss-ai-chat).ss-ai-bilingual {
+  box-sizing: border-box;
+  width: min(400px, calc(100vw - 16px));
+  max-height: calc(100dvh - 16px);
+  overflow: auto;
+  padding: 0;
+  border: 1px solid #d5e3d8;
+  border-radius: 21px;
+  background: #fbfaf5;
+  color: #183c31;
+  box-shadow: 0 20px 55px #173a352f, 0 3px 10px #173a3517;
+}
+:is(.ss-ai-panel, .ss-ai-chat).ss-ai-bilingual > :first-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: linear-gradient(125deg, #183e34, #326a55);
+  color: #fff;
+}
+.ss-ai-bilingual > :first-child strong { flex: 1; color: #fff; }
+.ss-ai-bilingual > :first-child select {
+  width: auto;
+  max-width: 92px;
+  margin: 0;
+  padding: 6px;
+  border: 1px solid #ffffff55;
+  border-radius: 9px;
+  background: #f0f5ed;
+  color: #183c31;
+  font-size: 13px;
+}
+.ss-ai-bilingual .ss-ai-log {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: min(210px, 28dvh);
+  max-height: min(330px, 42dvh);
+  overflow-y: auto;
+  padding: 15px;
+  background: linear-gradient(#eaf2e9, #faf9f4);
+}
+.ss-ai-bilingual .ss-ai-log p[data-sender] {
+  box-sizing: border-box;
+  flex-shrink: 0;
+  width: fit-content;
+  max-width: 82%;
+  margin: 0;
+  padding: 10px 13px;
+  font-size: 14px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.ss-ai-bilingual .ss-ai-log p[data-sender="bot"] {
+  align-self: flex-start;
+  margin-left: 34px;
+  color: #183c31;
+  background: #fff;
+  border: 1px solid #d8e4d9;
+  border-radius: 5px 16px 16px 16px;
+}
+.ss-ai-bilingual .ss-ai-log p[data-sender="user"] {
+  align-self: flex-end;
+  background: #245c49;
+  color: #fff;
+  border-radius: 16px 5px 16px 16px;
+}
+.ss-ai-bilingual form { padding: 10px 12px; }
+.ss-ai-bilingual form input { min-width: 0; }
+.ss-ai-bilingual form button[type="submit"] { background: #245c49; color: #fff; }
+.ss-ai-bilingual form :is(.ss-ai-row, .ss-ai-voice) { gap: 7px; }
+.ss-ai-bilingual [aria-hidden="true"][role="status"] { display: none; }
+.ss-ai-bilingual .ss-ai-status-translated:not(:empty) {
+  display: block;
+  padding: 0 12px 10px;
+  color: #245c49;
+  font-size: 13px;
+}
