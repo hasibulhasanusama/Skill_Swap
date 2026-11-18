@@ -1,3 +1,4 @@
+import { migrateDatabase } from "./migrations.js";
 import {startSessionTimerWorker} from "./session-timer.js";
 import "dotenv/config";
 import session from "express-session";
@@ -18,6 +19,33 @@ if (process.env.NODE_ENV === "production") {
 }
 await pool.query("SELECT id FROM platform_policies WHERE id=1");
 const store = new (pgSession(session))({ pool, tableName: "session" });
+
+// Verify database before creating the app
+console.log("Checking startup database migrations...");
+
+const startupMigrations = await migrateDatabase(pool);
+
+console.log(
+  startupMigrations.length
+    ? "Startup migrations applied: " + startupMigrations.join(", ")
+    : "Startup migrations already applied."
+);
+
+const startupTables = await pool.query(
+  "SELECT to_regclass('arena_materials') AS materials," +
+  "to_regclass('arena_rooms') AS rooms," +
+  "to_regclass('exchange_offers') AS offers," +
+  "to_regclass('learning_session_clocks') AS clocks"
+);
+
+if (Object.values(startupTables.rows[0]).some(value => !value)) {
+  throw new Error(
+    "Startup database check failed: required feature tables are missing."
+  );
+}
+
+console.log("Startup database tables verified.");
+
 const app = createApp({ db: pool, store });
 const stopSessionTimers=startSessionTimerWorker(pool);
 const server = app.listen(process.env.PORT || 3000, () =>
